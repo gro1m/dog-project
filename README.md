@@ -10,7 +10,7 @@ They show how you will get you a copy of the project up and running on your loca
 
 1. Clone the repository and navigate to the downloaded folder.
 ```	
-git clone https://github.com/udacity/dog-project.git
+git clone https://github.com/gro1m/dog-project.git
 cd dog-project
 ```
 
@@ -98,7 +98,7 @@ To test your own image, add a cell under __Step 7: Test Your Algorithm__ and add
 
 ## License
 
-This project is licensed under the MIT License - see LICENSE.txt file for details
+This project is licensed under the MIT License - see [LICENSE.txt](LICENSE.txt) file for details
 
 ## Acknowledgments
 
