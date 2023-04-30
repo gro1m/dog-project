@@ -1,6 +1,6 @@
 .DS_Store
-dogImages/
-lfw/
+datasets/*
+!datasets/haarcascades
 saved_models/weights.best.from_scratch.hdf5
 saved_models/weights.best.vgg16.hdf5
 saved_models/Xception.best_weights.hdf5
