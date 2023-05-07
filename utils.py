@@ -11,6 +11,7 @@ from sklearn.model_selection import train_test_split
 import cv2
 import matplotlib.pyplot as plt
 import random
+from tensorflow.keras.datasets import cifar100
 
 
 class Dataset:
@@ -24,7 +25,24 @@ class Dataset:
 
 
 class Nature:
-    pass
+    @staticmethod
+    def datasets():
+        files_dict = dict.fromkeys(("train", "valid", "test"))
+        labels_dict = dict.fromkeys(("train", "valid", "test"))
+
+        # Load the CIFAR-100 data
+        (files_dict["train"], labels_dict["train"]), (
+            files_dict["valid"],
+            labels_dict["valid"],
+        ) = cifar100.load_data(label_mode="fine")
+        (files_dict["valid"], labels_dict["valid"]), (
+            files_dict["test"],
+            labels_dict["test"],
+        ) = train_test_split(
+            files_dict["valid"], labels_dict["valid"], test_size=0.5, random_state=42
+        )
+
+        return files_dict, labels_dict
 
 
 class Animal:
@@ -241,8 +259,8 @@ class Human:
 
     @staticmethod
     def store_raw_images(
-        neg_samples, # choose samples from Animal (and maybe Nature dataset), make sure it is training data
-        pos_samples, # choose samples from LFW dataset, make sure it is training data
+        neg_samples,  # choose samples from Animal (and maybe Nature dataset), make sure it is training data
+        pos_samples,  # choose samples from LFW dataset, make sure it is training data
         x_pixels=250,
         y_pixels=250,
         neg_out_dir=os.path.join("datasets", "neg"),
