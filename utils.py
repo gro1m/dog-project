@@ -34,6 +34,13 @@ class Dataset:
 
 class Nature:
     @staticmethod
+    def whole_dataset():
+        files_dict, labels_dict = Nature.datasets()
+        files_dataset = files_dict["train"].tolist()+files_dict["test"].tolist()+files_dict["valid"].tolist()
+        labels_dataset = labels_dict["train"].tolist()+labels_dict["test"].tolist()+labels_dict["valid"].tolist()
+        return files_dataset, labels_dataset
+
+    @staticmethod
     def datasets():
         files_dict = dict.fromkeys(("train", "valid", "test"))
         labels_dict = dict.fromkeys(("train", "valid", "test"))
@@ -43,10 +50,9 @@ class Nature:
             files_dict["valid"],
             labels_dict["valid"],
         ) = cifar100.load_data(label_mode="fine")
-        (files_dict["valid"], labels_dict["valid"]), (
-            files_dict["test"],
-            labels_dict["test"],
-        ) = train_test_split(
+
+
+        files_dict["valid"], files_dict["test"],labels_dict["valid"], labels_dict["test"] = train_test_split(
             files_dict["valid"], labels_dict["valid"], test_size=0.5, random_state=42
         )
 
@@ -80,7 +86,7 @@ class Animal:
             )
 
     @staticmethod
-    def datasets(directory=os.path.join("datasets", "animals", "JPEGImages")):
+    def whole_dataset(directory=os.path.join("datasets", "animals", "JPEGImages")):
         subdirs = [
             name
             for name in os.listdir(directory)
@@ -89,7 +95,11 @@ class Animal:
 
         no_categories = len(set(subdirs))
         files_dataset, labels_dataset = Dataset.load_dataset(directory, no_categories)
-
+        return files_dataset, labels_dataset, no_categories
+    
+    @staticmethod
+    def datasets():
+        files_dataset, labels_dataset, no_categories = Animal.whole_dataset()
         files_dict = dict.fromkeys(("train", "valid", "test"))
         labels_dict = dict.fromkeys(("train", "valid", "test"))
 
@@ -111,9 +121,9 @@ class Animal:
             files_dict["valid"], labels_dict["valid"], test_size=0.5, random_state=42
         )
 
-        print(f"There are {no_categories} total human categories.")
+        print(f"There are {no_categories} total animal ategories.")
         print(
-            f'There are {len(np.hstack([files_dict["train"], files_dict["valid"], files_dict["test"]]))} total human images.\n'
+            f'There are {len(np.hstack([files_dict["train"], files_dict["valid"], files_dict["test"]]))} total animal images.\n'
         )
         print(
             f'There are {len(files_dict["train"])} training files and {len(labels_dict["train"])} training labels.'
@@ -129,6 +139,13 @@ class Animal:
 
 
 class Dog:
+    @staticmethod
+    def whole_dataset():
+        files_dict, labels_dict, _ = Dog.datasets()
+        files_dataset = files_dict["train"].tolist()+files_dict["test"].tolist()+files_dict["valid"].tolist()
+        labels_dataset = labels_dict["train"].tolist()+labels_dict["test"].tolist()+labels_dict["valid"].tolist()
+        return files_dataset, labels_dataset
+
     @staticmethod
     def datasets(directory=os.path.join("datasets", "dogImages")):
         dataset_keys = ("train", "valid", "test")
@@ -191,7 +208,7 @@ class Human:
         print(pathlib.Path(data_dir))
 
     @staticmethod
-    def datasets(directory=os.path.join("datasets", "lfw")):
+    def whole_dataset(directory=os.path.join("datasets", "lfw")):
         subdirs = [
             name
             for name in os.listdir(directory)
@@ -200,6 +217,11 @@ class Human:
 
         no_categories = len(set(subdirs))
         files_dataset, labels_dataset = Dataset.load_dataset(directory, no_categories)
+        return files_dataset, labels_dataset, no_categories
+
+    @staticmethod
+    def datasets():
+        files_dataset, labels_dataset, no_categories = Human.whole_dataset()
 
         files_dict = dict.fromkeys(("train", "valid", "test"))
         labels_dict = dict.fromkeys(("train", "valid", "test"))
@@ -239,20 +261,17 @@ class Human:
         return files_dict, labels_dict
 
     @staticmethod
-    def no_faces_detector(img_path):
+    def no_faces_detector(img_path, haarcascade_filepath=os.path.join("datasets", "haarcascades", "haarcascade_frontalface_alt.xml")):
         # extract pre-trained face detector
-        face_cascade = cv2.CascadeClassifier(
-            "haarcascades/haarcascade_frontalface_alt.xml"
-        )
+        face_cascade = cv2.CascadeClassifier(haarcascade_filepath)
         img = cv2.imread(img_path)
-        print(f"Shape of image: {img.shape}")
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        return face_cascade.detectMultiScale(gray)
+        return face_cascade.detectMultiScale(gray), img.shape
 
     @staticmethod
     def face_detector(img_path):
-        faces = Human.no_faces_detector(img_path)
-        return len(faces) > 0
+        faces, img_shape = Human.no_faces_detector(img_path)
+        return len(faces) > 0, img_shape
 
     @staticmethod
     def write_resized_img(img, x_pixels, y_pixels, out_path):
@@ -297,7 +316,7 @@ class Human:
     @staticmethod
     def test_faces_detector(img_path):
         img = cv2.imread(img_path)
-        faces = Human.no_faces_detector(img_path)
+        faces, _ = Human.no_faces_detector(img_path)
 
         # get bounding box for each detected face
         for x, y, w, h in faces:
@@ -316,40 +335,67 @@ class Human:
         human_files_short = human_files[0:no_samples]
         dog_files_short = dog_files[0:no_samples]
 
-        h_in_h_count = 0
-        h_in_d_count = 0
+        dict_h_in_h, dict_h_in_d = dict(), dict()
 
-        for human_files_1 in human_files_short:
-            if Human.face_detector(human_files_1):
-                h_in_h_count += 1
+        for iter_count, human_files in enumerate(human_files_short):
+            is_face, img_shape = Human.face_detector(human_files)
+            if is_face:
+                if img_shape in dict_h_in_h:
+                    dict_h_in_h[img_shape] += 1
+                else:
+                    dict_h_in_h[img_shape] = 1
             else:
                 print(
-                    f"no human detected at index i = {np.where(human_files_1==human_files_short)[0][0]}"
+                    f"no human detected at index {iter_count} which corresponds to file = {human_files}"
                 )
 
-        for dog_files in dog_files_short:
-            if Human.face_detector(dog_files):
-                h_in_d_count += 1
+        for iter_count, dog_files in enumerate(dog_files_short):
+            is_face, img_shape = Human.face_detector(dog_files)
+            if is_face:
+                print(
+                    f"detected human in dog image at index {iter_count} which corresponds to file = {dog_files}"
+                )
+                if img_shape in dict_h_in_d:
+                    dict_h_in_d[img_shape] += 1
+                else:
+                    dict_h_in_d[img_shape] = 1
 
-        h_in_h_relative = h_in_h_count / (len(human_files_short))
-        h_in_d_relative = h_in_d_count / (len(dog_files_short))
+        h_in_h_relative = sum(dict_h_in_h.values()) / (len(human_files_short))
         print(f"percentage of detected humans in human images = {h_in_h_relative:.1%}")
+
+        h_in_d_relative = sum(dict_h_in_d.values())/ (len(dog_files_short))
         print(f"percentage of detected humans in dog images = {h_in_d_relative:.1%}")
 
 class Face:
     @staticmethod
-    def labelled_data():
-        human_files_dict = Human.datasets()[0]
-        nature_files_dict = Nature.datasets()[0]
-        animal_files_dict = Animal.datasets()[0]
-        dog_files_dict = Dog.datasets()[0]
+    def image_paths():
+        list_human_files = [str(e) for e in Human.whole_dataset()[0]]
+        list_array_nature = Nature.whole_dataset()[0]
+        list_animal_files = [str(e) for e in Animal.whole_dataset()[0]]
+        list_dog_files = [str(e) for e in Dog.whole_dataset()[0]]
 
-        noface_img_paths = itertools.chain(nature_files_dict.values(), animal_files_dict.values(), dog_files_dict.values())
-        face_img_paths = human_files_dict.values()
-        img_paths = noface_img_paths + face_img_paths
-        
-        data = [cv2.imread(p) for p in img_paths]
-        labels = [np.concatenate((np.zeros(len(noface_img_paths)), np.ones(len(face_img_paths))),axis=0)]
+        number_noface_images = len(list_array_nature+list_animal_files+list_dog_files)
+        number_face_images = len(list_human_files)
+        print(f"Number of 'no face' images = {number_noface_images}")
+        print(f"Number of 'face' images = {number_face_images}")
+        return list_array_nature, list_animal_files+list_dog_files+list_human_files, number_noface_images, number_face_images
+
+    @staticmethod
+    def labelled_data():
+        import cProfile
+        profiler = cProfile.Profile()
+        profiler.enable()
+        print("Read image paths...")
+        list_array_nature, img_paths, number_noface_images, number_face_images = Face.image_paths()
+        print("done.")
+        print("Processing files with open cv...")
+        data = list_array_nature+[cv2.imread(p) for p in img_paths]
+        print("done.")
+        print("Making labels...")
+        labels = [np.concatenate((np.zeros(number_noface_images), np.ones(number_face_images)),axis=0)]
+        print("done.")
+        profiler.disable()
+        profiler.print_stats(sort='cumulative')
         return data, labels
 
     @staticmethod

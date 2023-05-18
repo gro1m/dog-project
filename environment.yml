@@ -1,0 +1,14 @@
+name: dog-project
+dependencies:
+- conda-forge::python=3.9.*
+- conda-forge::ipykernel=6.23.*
+- conda-forge::opencv=4.7.*
+- conda-forge::h5py=3.8.*
+- conda-forge::matplotlib=3.7.*
+- conda-forge::numpy=1.24.*
+- conda-forge::scipy=1.10.*
+- conda-forge::tqdm=4.65.*
+- conda-forge::scikit-learn=1.2.*
+- conda-forge::pillow=9.5.*
+- conda-forge::tensorflow==2.11.* # keras is integrated in tensorflow
+- conda-forge::tensorflow-datasets==4.8.*
