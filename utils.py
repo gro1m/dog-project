@@ -12,6 +12,14 @@ import cv2
 import matplotlib.pyplot as plt
 import random
 from tensorflow.keras.datasets import cifar100
+from sklearn.model_selection import StratifiedShuffleSplit
+
+from keras.layers import Conv2D, MaxPooling2D, GlobalAveragePooling2D
+from keras.layers import Dropout, Flatten, Dense, BatchNormalization
+from keras.layers import Activation
+from keras.models import Sequential
+
+import itertools
 
 
 class Dataset:
@@ -327,3 +335,117 @@ class Human:
         h_in_d_relative = h_in_d_count / (len(dog_files_short))
         print(f"percentage of detected humans in human images = {h_in_h_relative:.1%}")
         print(f"percentage of detected humans in dog images = {h_in_d_relative:.1%}")
+
+class Face:
+    @staticmethod
+    def labelled_data():
+        human_files_dict = Human.datasets()[0]
+        nature_files_dict = Nature.datasets()[0]
+        animal_files_dict = Animal.datasets()[0]
+        dog_files_dict = Dog.datasets()[0]
+
+        noface_img_paths = itertools.chain(nature_files_dict.values(), animal_files_dict.values(), dog_files_dict.values())
+        face_img_paths = human_files_dict.values()
+        img_paths = noface_img_paths + face_img_paths
+        
+        data = [cv2.imread(p) for p in img_paths]
+        labels = [np.concatenate((np.zeros(len(noface_img_paths)), np.ones(len(face_img_paths))),axis=0)]
+        return data, labels
+
+    @staticmethod
+    def datasets(data=None, labels=None, test_size=0.1, val_size=0.1, normalization_factor=255):
+        train_size = 1 - (test_size + val_size)
+        test_val_size = 1 - train_size
+        # split into 80% train data (first entry [0][0]) and 20% test data (second entry [0][1])
+        stratSplit1 = StratifiedShuffleSplit(n_splits = 1, test_size   = test_val_size, train_size  = train_size,random_state=None)
+        
+        # split into total 10 % test data and total 10% validation data
+        stratSplit2 = StratifiedShuffleSplit(n_splits=1,test_size = test_size/test_val_size,train_size = val_size/test_val_size,random_state=None)
+
+        data,labels = Face.labelled_data()
+        indices1 = stratSplit1.split(data, labels)
+
+        train_indices, test_val_indices = indices1[0][0], indices1[0][1]
+        X_train, labels_train  = [data[train_indices[idx1]] for idx1 in indices1], labels[train_indices]
+        
+        X_test_val, labels_test_val = [data[test_val_indices[idx1]] for idx1 in indices1], labels[test_val_indices]
+        indices2 = list(stratSplit2.split(X_test_val,labels_test_val))
+        test_indices, val_indices  = indices2[0][0], indices2[0][1]
+        X_test, labels_test  = [data[test_indices[idx1]] for idx1 in indices1], labels[test_indices]
+        X_val, labels_val  = [data[val_indices[idx1]] for idx1 in indices1], labels[val_indices]
+
+        X_train, y_train = np.asarray(X_train).astype('float32')/normalization_factor, np.asarray(labels_train)
+        X_test,  y_test  = np.asarray(X_test).astype('float32')/normalization_factor , np.asarray(labels_test)
+        X_val, y_val = np.asarray(X_val).astype('float32')/normalization_factor, np.asarray(labels_val)
+
+        print(f"Train      shapes ({X_train.shape}, {y_train.shape}):", )
+        print(f"Validation shapes ({X_val.shape}, {y_val.shape}):")
+        print(f"Test       shapes ({X_test.shape}, {y_test.shape})")
+
+        return X_train, X_val, X_test, y_train, y_val, y_test
+    
+    def model():
+        def conv2d(mdl, filters = 16, kernel_size = (3,3), strides = (1, 1),\
+                padding = 'same', input_shape = None, name = 'conv'):
+            if(input_shape == None):
+                mdl.add(Conv2D(filters     = filters,\
+                            kernel_size = kernel_size,\
+                            strides     = strides,\
+                            padding     = padding,\
+                            name        = name))
+            else:
+                mdl.add(Conv2D(filters     = filters,\
+                            kernel_size = kernel_size,\
+                            strides     = strides,\
+                            padding     = padding,\
+                            input_shape = input_shape,\
+                            name        = name))
+
+        def maxpool2d(mdl, pool_size = (2,2), strides = (2,2), name = 'maxpool'):
+            mdl.add(MaxPooling2D(pool_size, strides, name = name))
+
+        def activation(mdl, activation = 'relu', name = 'activation'):
+            mdl.add(Activation(activation, name = name))
+
+        def gap2d(mdl,data_format = 'channels_last'):
+            mdl.add(GlobalAveragingPooling2D(data_format))
+
+        def flatten(mdl, name='flatten'):
+            mdl.add(Flatten(name=name))
+
+        def dense(mdl, filters, name='dense'):
+            mdl.add(Dense(filters, name=name))
+
+        def dropout(mdl, drop_prob = 0.2, name='dropout'):
+            mdl.add(Dropout(drop_prob, name=name))
+            
+        def batchnormalize(mdl, name='batchnormalize'):
+            mdl.add(BatchNormalization(name=name))
+
+        faces_model = Sequential()
+
+        ### TODO: Define your architecture.
+        conv2d(faces_model, input_shape = (250,250,3), name='faces_conv2d_1')
+        dropout(faces_model, name='faces_dropout_1')
+        batchnormalize(faces_model,name='faces_batchnorm_1')
+        activation(faces_model, name='faces_activation_1')
+        maxpool2d(faces_model, name='faces_maxpool_1')
+        conv2d(faces_model, filters = 32, name='faces_conv2d_2')
+        dropout(faces_model, name='faces_dropout_2')
+        batchnormalize(faces_model,name='faces_batchnorm_2')
+        activation(faces_model, name='faces_activation_2')
+        maxpool2d(faces_model, name='faces_maxpool_2')
+        conv2d(faces_model, filters = 64, name='faces_conv2d_3')
+        dropout(faces_model, name='faces_dropout_3')
+        batchnormalize(faces_model,name='faces_batchnorm_3')
+        activation(faces_model, name='faces_activation_3')
+        maxpool2d(faces_model, name='faces_maxpool_3')
+        flatten(faces_model, name='faces_flatten')
+        dense(faces_model, filters = 1, name='faces_dense')
+        batchnormalize(faces_model,name='faces_batchnorm_4')
+        activation(faces_model, 'softmax', name='faces_activation_4')
+
+        faces_model.summary()
+
+        faces_model.compile(optimizer="rmsprop", loss="binary_crossentropy", metrics=["accuracy"])
+        return faces_model
